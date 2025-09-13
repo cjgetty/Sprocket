@@ -1377,6 +1377,7 @@ struct SimpleLightMeterView: View {
                             .buttonStyle(PlainButtonStyle())
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding()
                     .background(Color(.systemGray6))
                     .cornerRadius(12)
