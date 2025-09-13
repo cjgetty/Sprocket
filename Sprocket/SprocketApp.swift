@@ -13,7 +13,7 @@ struct SprocketApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            MainAppView()
                 .environment(\.managedObjectContext, persistenceController.container.viewContext)
         }
     }
