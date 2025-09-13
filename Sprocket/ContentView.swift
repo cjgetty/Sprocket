@@ -1,4 +1,4 @@
-//
+ //
 //  ContentView.swift
 //  Sprocket
 //
@@ -42,6 +42,8 @@ struct ContentView: View {
     // Managers for shot logging
     @StateObject private var locationManager = LocationManager()
     @ObservedObject private var coreDataManager = CoreDataManager.shared
+    @ObservedObject private var filmStockManager = FilmStockManager.shared
+    @ObservedObject private var reciprocityCalculator = ReciprocityCalculator.shared
     
     // Camera reference for photo capture
     @State private var cameraView: CameraPreviewView?
@@ -68,12 +70,13 @@ struct ContentView: View {
                 currentISO: $currentISO,
                 onLogShot: logShot
             )
-            .frame(height: 250)
+            .frame(height: 300)
             .background(Color.black.opacity(0.8))
         }
         .ignoresSafeArea()
         .onAppear {
             locationManager.requestLocationPermission()
+            setupFilmStockCallback()
         }
         .overlay(
             // Success message overlay
@@ -100,6 +103,26 @@ struct ContentView: View {
         )
     }
     
+    // Setup callback for film stock selection
+    private func setupFilmStockCallback() {
+        filmStockManager.onFilmStockSelected = { filmStock in
+            DispatchQueue.main.async {
+                self.updateISOForFilmStock(filmStock)
+            }
+        }
+    }
+    
+    // Update ISO when film stock is selected
+    private func updateISOForFilmStock(_ filmStock: FilmStock?) {
+        guard let filmStock = filmStock else { return }
+        
+        // Update the current ISO to match the film stock's ISO
+        currentISO = filmStock.iso
+        
+        // Trigger haptic feedback to indicate the change
+        triggerHaptic(.light)
+    }
+    
     // Function to log a shot
     private func logShot(aperture: Double, shutterSpeed: Double, iso: Double, ev: Double) {
         // Get current location
@@ -108,16 +131,29 @@ struct ContentView: View {
         // Capture reference photo
         cameraView?.capturePhoto { imageData in
             DispatchQueue.main.async {
-                // Save to Core Data
-                coreDataManager.saveLoggedShot(
+                // Calculate effective ISO and exposure settings with film stock
+                let exposureSettings = reciprocityCalculator.calculateExposure(
+                    meteredEV: ev,
+                    filmStock: filmStockManager.selectedFilmStock,
+                    baseISO: iso,
+                    pushPullStops: filmStockManager.pushPullStops
+                )
+                
+                // Use effective ISO and corrected exposure time
+                let effectiveISO = exposureSettings.effectiveISO
+                let correctedShutterSpeed = exposureSettings.correctedExposureTime
+                
+                // Save to Core Data with film stock relationship
+                coreDataManager.saveLoggedShotWithFilmStock(
                     aperture: aperture,
-                    shutterSpeed: shutterSpeed,
-                    iso: iso,
+                    shutterSpeed: correctedShutterSpeed,
+                    iso: effectiveISO,
                     ev: ev,
                     latitude: locationManager.location?.coordinate.latitude,
                     longitude: locationManager.location?.coordinate.longitude,
                     imageData: imageData,
-                    locationName: locationManager.locationName
+                    locationName: locationManager.locationName,
+                    filmStock: filmStockManager.selectedFilmStock
                 )
                 
                 // Show success message
@@ -474,6 +510,13 @@ struct SimpleLightMeterView: View {
     @AppStorage("stopSize") private var stopSize = "third"
     @AppStorage("showReciprocityFailure") private var showReciprocityFailure = true
     
+    // Film stock integration
+    @ObservedObject private var filmStockManager = FilmStockManager.shared
+    @ObservedObject private var reciprocityCalculator = ReciprocityCalculator.shared
+    @State private var showingFilmStockSettings = false
+    @State private var calculatedExposure: ExposureSettings?
+    @State private var reciprocityWarning: ReciprocityWarning?
+    
     // Dynamic photography values based on stop size
     private var apertureStops: [Double] {
         switch stopSize {
@@ -687,29 +730,104 @@ struct SimpleLightMeterView: View {
         hasMeterReading = true
     }
     
+    // Setup callback for film stock selection
+    private func setupFilmStockCallback() {
+        filmStockManager.onFilmStockSelected = { filmStock in
+            DispatchQueue.main.async {
+                self.updateISOForFilmStock(filmStock)
+            }
+        }
+    }
+    
+    // Update ISO when film stock is selected
+    private func updateISOForFilmStock(_ filmStock: FilmStock?) {
+        guard let filmStock = filmStock else { return }
+        
+        // Update the ISO index to match the film stock's ISO
+        let newISOIndex = findClosestIndex(filmStock.iso, in: isoValues)
+        isoIndex = newISOIndex
+        
+        // Update parent state
+        updateParentState()
+        
+        // Trigger haptic feedback to indicate the change
+        triggerHaptic(.light)
+    }
+    
     var body: some View {
             GeometryReader { geometry in
-                VStack(alignment: .leading, spacing: 15) {
+                VStack(alignment: .leading, spacing: 12) {
                     // EV Display at top
                     HStack {
                         Text("EV")
                             .font(.caption)
                             .foregroundColor(.gray)
                         Text(String(format: "%.1f", hasMeterReading ? baselineEV : currentEV))
-                            .font(.largeTitle)
+                            .font(.title)
                             .fontWeight(.bold)
                             .foregroundColor(.white)
                         
                         if !hasMeterReading {
                             Text("TAP TO METER")
-                                .font(.caption)
+                                .font(.caption2)
                                 .foregroundColor(.orange)
-                                .padding(.leading, 8)
+                                .padding(.leading, 6)
+                        }
+                    }
+                    
+                    // Film Stock Display
+                    if let selectedFilmStock = filmStockManager.selectedFilmStock {
+                        HStack {
+                            Button(action: {
+                                showingFilmStockSettings = true
+                            }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "film")
+                                        .foregroundColor(.blue)
+                                    Text(selectedFilmStock.name ?? "Unknown")
+                                        .font(.caption)
+                                        .foregroundColor(.blue)
+                                    Text("ISO \(Int(selectedFilmStock.iso))")
+                                        .font(.caption2)
+                                        .foregroundColor(.blue.opacity(0.8))
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption2)
+                                        .foregroundColor(.blue.opacity(0.6))
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.blue.opacity(0.2))
+                                .cornerRadius(6)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            
+                            Spacer()
+                        }
+                    } else {
+                        HStack {
+                            Button(action: {
+                                showingFilmStockSettings = true
+                            }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "plus.circle")
+                                        .foregroundColor(.orange)
+                                    Text("Select Film Stock")
+                                        .font(.caption)
+                                        .foregroundColor(.orange)
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.orange.opacity(0.2))
+                                .cornerRadius(6)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            
+                            Spacer()
                         }
                     }
                     
                     // Exposure controls in middle
-                    VStack(spacing: 10) {
+                    VStack(spacing: 8) {
                         // Calculate responsive width based on available space
                         let labelWidth = max(55, min(90, geometry.size.width * 0.22))
                         
@@ -846,24 +964,42 @@ struct SimpleLightMeterView: View {
                     // Reciprocity failure display at bottom (only if setting is enabled)
                     if hasMeterReading && showReciprocityFailure {
                         VStack(alignment: .leading, spacing: 4) {
-                            if localCurrentShutterSpeed >= 1.0 {
+                            // Calculate exposure settings with film stock
+                            let exposureSettings = reciprocityCalculator.calculateExposure(
+                                meteredEV: baselineEV,
+                                filmStock: filmStockManager.selectedFilmStock,
+                                baseISO: defaultISO,
+                                pushPullStops: filmStockManager.pushPullStops
+                            )
+                            
+                            // Check for reciprocity warning
+                            let warning = reciprocityCalculator.getReciprocityWarning(
+                                for: localCurrentShutterSpeed,
+                                filmStock: filmStockManager.selectedFilmStock
+                            )
+                            
+                            if let warning = warning {
                                 HStack {
                                     Text("Reciprocity:")
                                         .font(.caption)
                                         .foregroundColor(.orange)
                                     
-                                    Text("f/\(String(format: "%.1f", localCurrentAperture)) • \(formatShutterSpeed(reciprocityAdjustedTime)) • ISO \(String(format: "%.0f", localCurrentISO))")
+                                    Text("f/\(String(format: "%.1f", localCurrentAperture)) • \(formatShutterSpeed(warning.correctedTime)) • ISO \(String(format: "%.0f", exposureSettings.effectiveISO))")
                                         .font(.caption)
                                         .foregroundColor(.orange)
                                         .fontWeight(.medium)
                                 }
+                                
+                                Text(warning.message)
+                                    .font(.caption2)
+                                    .foregroundColor(.orange)
                             } else {
                                 HStack {
                                     Text("Exposure:")
                                         .font(.caption)
                                         .foregroundColor(.green)
                                     
-                                    Text("f/\(String(format: "%.1f", localCurrentAperture)) • \(formatShutterSpeed(localCurrentShutterSpeed)) • ISO \(String(format: "%.0f", localCurrentISO))")
+                                    Text("f/\(String(format: "%.1f", localCurrentAperture)) • \(formatShutterSpeed(localCurrentShutterSpeed)) • ISO \(String(format: "%.0f", exposureSettings.effectiveISO))")
                                         .font(.caption)
                                         .foregroundColor(.green)
                                         .fontWeight(.medium)
@@ -882,13 +1018,17 @@ struct SimpleLightMeterView: View {
                             .foregroundColor(.orange)
                     }
                 }
-                .padding()
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
             }
             .onChange(of: currentEV) { oldValue, newValue in
                 // New meter reading - establish baseline
                 if abs(newValue - oldValue) > 0.1 {
                     handleNewMeterReading()
                 }
+            }
+            .sheet(isPresented: $showingFilmStockSettings) {
+                FilmStockSettingsView()
             }
             .onChange(of: defaultISO) { _, _ in
                 updateIndicesForSettings()
@@ -902,6 +1042,7 @@ struct SimpleLightMeterView: View {
                 lastDefaultISO = defaultISO
                 lastStopSize = stopSize
                 updateIndicesForSettings()
+                setupFilmStockCallback()
             }
         }
     }
@@ -1403,6 +1544,33 @@ struct SimpleLightMeterView: View {
                                 .foregroundColor(.orange)
                                 .frame(width: 30)
                             Toggle("Show Reciprocity Failure", isOn: $showReciprocityFailure)
+                        }
+                    }
+                    
+                    Section("Film Stock") {
+                        NavigationLink(destination: FilmStockSettingsView()) {
+                            HStack {
+                                Image(systemName: "film")
+                                    .foregroundColor(.purple)
+                                    .frame(width: 30)
+                                VStack(alignment: .leading) {
+                                    Text("Film Stock Database")
+                                        .foregroundColor(.primary)
+                                    if let selectedFilmStock = FilmStockManager.shared.selectedFilmStock {
+                                        Text(selectedFilmStock.name ?? "Unknown")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    } else {
+                                        Text("No film stock selected")
+                                            .font(.caption)
+                                            .foregroundColor(.orange)
+                                    }
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(.secondary)
+                                    .font(.caption)
+                            }
                         }
                     }
                     
