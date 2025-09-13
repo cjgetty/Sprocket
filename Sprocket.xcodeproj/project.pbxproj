@@ -256,6 +256,8 @@
 				DEVELOPMENT_TEAM = XZWEZJ8YZA;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Sprocket needs camera access to measure light for photography.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Sprocket uses location to tag your photos with GPS coordinates.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -284,6 +286,8 @@
 				DEVELOPMENT_TEAM = XZWEZJ8YZA;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Sprocket needs camera access to measure light for photography.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Sprocket uses location to tag your photos with GPS coordinates.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
