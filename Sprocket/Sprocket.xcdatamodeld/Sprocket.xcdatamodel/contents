@@ -14,7 +14,7 @@
         <attribute name="reciprocityExponent" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="temperature" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="type" attributeType="String"/>
-        <relationship name="loggedShots" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="LoggedShot" inverseName="filmStock" inverseEntity="LoggedShot"/>
+        <relationship name="loggedShots" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="LoggedShot" inverseName="selectedFilmStock" inverseEntity="LoggedShot"/>
     </entity>
     <entity name="LoggedShot" representedClassName="LoggedShot" syncable="YES" codeGenerationType="class">
         <attribute name="aperture" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>

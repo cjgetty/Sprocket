@@ -6,9 +6,12 @@
 //
 
 import SwiftUI
-import AVFoundation
-import CoreLocation
+import CoreData
 import MapKit
+import CoreLocation
+import AVFoundation
+import Photos
+import UIKit
 
 // Haptic feedback helper
 func triggerHaptic(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .light) {
@@ -40,7 +43,7 @@ struct ContentView: View {
     @State private var currentISO: Double = 100
     
     // Managers for shot logging
-    @StateObject private var locationManager = LocationManager()
+    @ObservedObject private var locationManager = LocationManager.shared
     @ObservedObject private var coreDataManager = CoreDataManager.shared
     @ObservedObject private var filmStockManager = FilmStockManager.shared
     @ObservedObject private var reciprocityCalculator = ReciprocityCalculator.shared
@@ -284,7 +287,10 @@ class CameraPreviewView: UIView {
         layer.addSublayer(previewLayer)
         self.previewLayer = previewLayer
         
-        captureSession?.startRunning()
+        // Start capture session on background thread to avoid UI blocking
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            self?.captureSession?.startRunning()
+        }
     }
     
     // Function to capture photo
@@ -1267,6 +1273,9 @@ struct SimpleLightMeterView: View {
 
     struct ShotDetailView: View {
         let shot: LoggedShot
+        @State private var notes: String = ""
+        @State private var isEditingNotes = false
+        @ObservedObject private var coreDataManager = CoreDataManager.shared
         
         private var formattedDate: String {
             let formatter = DateFormatter()
@@ -1405,71 +1414,119 @@ struct SimpleLightMeterView: View {
                         .cornerRadius(12)
                     }
                     
+                    // Notes section
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("Notes")
+                                .font(.headline)
+                            Spacer()
+                            Button(isEditingNotes ? "Done" : "Edit") {
+                                if isEditingNotes {
+                                    saveNotes()
+                                }
+                                isEditingNotes.toggle()
+                            }
+                            .foregroundColor(.blue)
+                        }
+                        
+                        if isEditingNotes {
+                            TextEditor(text: $notes)
+                                .frame(minHeight: 100)
+                                .padding(8)
+                                .background(Color(.systemBackground))
+                                .cornerRadius(8)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(Color(.systemGray4), lineWidth: 1)
+                                )
+                        } else {
+                            if notes.isEmpty {
+                                Text("Tap Edit to add notes about this shot...")
+                                    .foregroundColor(.secondary)
+                                    .italic()
+                            } else {
+                                Text(notes)
+                                    .font(.body)
+                            }
+                        }
+                    }
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                    
                     Spacer()
                 }
                 .padding()
             }
             .navigationTitle("Shot Details")
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                notes = shot.notes ?? ""
+            }
+        }
+        
+        private func saveNotes() {
+            shot.notes = notes.isEmpty ? nil : notes
+            coreDataManager.save()
         }
     }
 
-    struct ShotLocationMapView: UIViewRepresentable {
-        let coordinate: CLLocationCoordinate2D
-        let locationName: String
+struct ShotLocationMapView: UIViewRepresentable {
+    let coordinate: CLLocationCoordinate2D
+    let locationName: String
+    
+    func makeUIView(context: Context) -> MKMapView {
+        let mapView = MKMapView()
+        mapView.delegate = context.coordinator
+        mapView.isUserInteractionEnabled = true
+        mapView.showsUserLocation = false
         
-        func makeUIView(context: Context) -> MKMapView {
-            let mapView = MKMapView()
-            mapView.delegate = context.coordinator
-            mapView.isUserInteractionEnabled = true
-            mapView.showsUserLocation = false
-            
-            // Create annotation for the shot location
-            let annotation = MKPointAnnotation()
-            annotation.coordinate = coordinate
-            annotation.title = locationName
-            annotation.subtitle = "Photo taken here"
-            
-            mapView.addAnnotation(annotation)
-            
-            // Set region to show the shot location
-            let region = MKCoordinateRegion(
-                center: coordinate,
-                latitudinalMeters: 1000,
-                longitudinalMeters: 1000
-            )
-            mapView.setRegion(region, animated: false)
-            
-            return mapView
-        }
+        // Create annotation for the shot location
+        let annotation = MKPointAnnotation()
+        annotation.coordinate = coordinate
+        annotation.title = locationName
+        annotation.subtitle = "Photo taken here"
         
-        func updateUIView(_ uiView: MKMapView, context: Context) {
-            // Update if needed
-        }
+        mapView.addAnnotation(annotation)
         
-        func makeCoordinator() -> Coordinator {
-            Coordinator()
-        }
+        // Set region to show the shot location
+        let region = MKCoordinateRegion(
+            center: coordinate,
+            latitudinalMeters: 1000,
+            longitudinalMeters: 1000
+        )
+        mapView.setRegion(region, animated: false)
         
-        class Coordinator: NSObject, MKMapViewDelegate {
-            func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
-                let identifier = "ShotLocation"
-                
-                var annotationView = mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? MKMarkerAnnotationView
-                
-                if annotationView == nil {
-                    annotationView = MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: identifier)
-                    annotationView?.canShowCallout = true
-                    annotationView?.markerTintColor = .systemBlue
-                    annotationView?.glyphImage = UIImage(systemName: "camera.fill")
-                } else {
-                    annotationView?.annotation = annotation
-                }
-                
-                return annotationView
+        return mapView
+    }
+    
+    func updateUIView(_ uiView: MKMapView, context: Context) {
+        // Update if needed
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+    
+    class Coordinator: NSObject, MKMapViewDelegate {
+        func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
+            let identifier = "ShotLocation"
+            
+            var annotationView = mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? MKMarkerAnnotationView
+            
+            if annotationView == nil {
+                annotationView = MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: identifier)
+                annotationView?.canShowCallout = true
+                annotationView?.markerTintColor = .systemBlue
+                annotationView?.glyphImage = UIImage(systemName: "camera.fill")
+            } else {
+                annotationView?.annotation = annotation
             }
+            
+            return annotationView
         }
     }
+}
 
     // MARK: - Settings View
     struct SettingsView: View {
@@ -1479,6 +1536,9 @@ struct SimpleLightMeterView: View {
         @AppStorage("defaultISO") private var defaultISO = 100.0
         @AppStorage("showReciprocityFailure") private var showReciprocityFailure = true
         @AppStorage("stopSize") private var stopSize = "third" // "full", "half", "third"
+        @AppStorage("appearanceMode") private var appearanceMode = "system" // "system", "light", "dark"
+        
+        @Environment(\.colorScheme) private var systemColorScheme
         
         @ObservedObject private var coreDataManager = CoreDataManager.shared
         @State private var showingClearDataAlert = false
@@ -1502,6 +1562,23 @@ struct SimpleLightMeterView: View {
                                 .foregroundColor(.blue)
                                 .frame(width: 30)
                             Toggle("Location Services", isOn: $enableLocationServices)
+                        }
+                    }
+                    
+                    Section("Appearance") {
+                        HStack {
+                            Image(systemName: "moon")
+                                .foregroundColor(.purple)
+                                .frame(width: 30)
+                            Text("Dark Mode")
+                            Spacer()
+                            Picker("Appearance", selection: $appearanceMode) {
+                                Text("System").tag("system")
+                                Text("Light").tag("light")
+                                Text("Dark").tag("dark")
+                            }
+                            .pickerStyle(SegmentedPickerStyle())
+                            .frame(width: 180)
                         }
                     }
                     
@@ -1565,6 +1642,27 @@ struct SimpleLightMeterView: View {
                                             .font(.caption)
                                             .foregroundColor(.orange)
                                     }
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(.secondary)
+                                    .font(.caption)
+                            }
+                        }
+                    }
+                    
+                    Section("Planning Tools") {
+                        NavigationLink(destination: SunCalculatorView()) {
+                            HStack {
+                                Image(systemName: "sun.max")
+                                    .foregroundColor(.orange)
+                                    .frame(width: 30)
+                                VStack(alignment: .leading) {
+                                    Text("Sun Calculator")
+                                        .foregroundColor(.primary)
+                                    Text("Golden hour, blue hour & moon phases")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
                                 }
                                 Spacer()
                                 Image(systemName: "chevron.right")
@@ -1647,6 +1745,7 @@ struct SimpleLightMeterView: View {
                         }
                     }
                 }
+                .preferredColorScheme(currentColorScheme)
                 .alert("Clear All Data", isPresented: $showingClearDataAlert) {
                     Button("Cancel", role: .cancel) { }
                     Button("Clear All", role: .destructive) {
@@ -1742,7 +1841,7 @@ struct SimpleLightMeterView: View {
         }
         
         private func generateCSVContent(from shots: [LoggedShot]) -> String {
-            var csv = "Date,Time,Aperture,Shutter Speed,ISO,EV,Location,Latitude,Longitude\n"
+            var csv = "Date,Time,Aperture,Shutter Speed,ISO,EV,Location,Latitude,Longitude,Notes\n"
             
             let dateFormatter = DateFormatter()
             dateFormatter.dateFormat = "yyyy-MM-dd"
@@ -1760,8 +1859,9 @@ struct SimpleLightMeterView: View {
                             let location = shot.locationName?.replacingOccurrences(of: ",", with: " ") ?? ""
                             let lat = shot.latitude == 0 ? "" : String(format: "%.6f", shot.latitude)
                             let lon = shot.longitude == 0 ? "" : String(format: "%.6f", shot.longitude)
+                            let notes = shot.notes?.replacingOccurrences(of: ",", with: " ").replacingOccurrences(of: "\n", with: " ") ?? ""
                             
-                            csv += "\(date),\(time),f/\(aperture),\(shutter),\(iso),\(ev),\(location),\(lat),\(lon)\n"
+                            csv += "\(date),\(time),f/\(aperture),\(shutter),\(iso),\(ev),\(location),\(lat),\(lon),\"\(notes)\"\n"
                         }
                         
                         return csv
@@ -1771,19 +1871,24 @@ struct SimpleLightMeterView: View {
                         if speed >= 1.0 {
                             return speed == floor(speed) ? "\(Int(speed))s" : String(format: "%.1fs", speed)
                         } else {
-                            return "1/\(Int(1.0 / speed))"
+                            let denominator = Int(1.0 / speed)
+                            return "1/\(denominator)s"
                         }
                     }
                     
                     private func clearAllData() {
-                        let shots = coreDataManager.fetchLoggedShots()
-                        
-                        for shot in shots {
-                            coreDataManager.deleteLoggedShot(shot)
+                        coreDataManager.clearAllData()
+                    }
+                    
+                    private var currentColorScheme: ColorScheme? {
+                        switch appearanceMode {
+                        case "light":
+                            return .light
+                        case "dark":
+                            return .dark
+                        default:
+                            return nil // System default
                         }
-                        
-                        // Haptic feedback for deletion
-                        triggerHaptic(.heavy)
                     }
                 }
 

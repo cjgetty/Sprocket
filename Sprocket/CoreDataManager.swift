@@ -164,4 +164,30 @@ class CoreDataManager: ObservableObject {
         save()
         print("Shot logged successfully with film stock relationship!")
     }
+    
+    // Clear all data
+    func clearAllData() {
+        let shotRequest: NSFetchRequest<LoggedShot> = LoggedShot.fetchRequest()
+        let filmStockRequest: NSFetchRequest<FilmStock> = FilmStock.fetchRequest()
+        
+        do {
+            let shots = try context.fetch(shotRequest)
+            for shot in shots {
+                context.delete(shot)
+            }
+            
+            let filmStocks = try context.fetch(filmStockRequest)
+            for filmStock in filmStocks {
+                context.delete(filmStock)
+            }
+            
+            save()
+            
+            // Re-initialize film stock database
+            initializeFilmStockDatabase()
+            
+        } catch {
+            print("Error clearing data: \(error)")
+        }
+    }
 }
