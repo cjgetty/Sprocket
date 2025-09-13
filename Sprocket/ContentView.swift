@@ -74,7 +74,7 @@ struct ContentView: View {
                 onLogShot: logShot
             )
             .frame(height: 300)
-            .background(Color.black.opacity(0.8))
+            .background(Color(.systemBackground).opacity(0.95))
         }
         .ignoresSafeArea()
         .onAppear {
@@ -767,11 +767,11 @@ struct SimpleLightMeterView: View {
                     HStack {
                         Text("EV")
                             .font(.caption)
-                            .foregroundColor(.gray)
+                            .foregroundColor(.secondary)
                         Text(String(format: "%.1f", hasMeterReading ? baselineEV : currentEV))
                             .font(.title)
                             .fontWeight(.bold)
-                            .foregroundColor(.white)
+                            .foregroundColor(.primary)
                         
                         if !hasMeterReading {
                             Text("TAP TO METER")
@@ -841,9 +841,9 @@ struct SimpleLightMeterView: View {
                         HStack(spacing: 8) {
                             HStack(spacing: 2) {
                                 Text("f/")
-                                    .foregroundColor(.white)
+                                    .foregroundColor(.primary)
                                 Text(String(format: "%.1f", localCurrentAperture))
-                                    .foregroundColor(.white)
+                                    .foregroundColor(.primary)
                                     .font(.system(.body, design: .monospaced))
                             }
                             .frame(minWidth: labelWidth, alignment: .leading)
@@ -879,7 +879,7 @@ struct SimpleLightMeterView: View {
                         // Shutter Speed
                         HStack(spacing: 8) {
                             Text(formatShutterSpeed(localCurrentShutterSpeed))
-                                .foregroundColor(.white)
+                                .foregroundColor(.primary)
                                 .font(.system(.body, design: .monospaced))
                                 .frame(minWidth: labelWidth, alignment: .leading)
                             
@@ -915,9 +915,9 @@ struct SimpleLightMeterView: View {
                         HStack(spacing: 8) {
                             HStack(spacing: 2) {
                                 Text("ISO")
-                                    .foregroundColor(.white)
+                                    .foregroundColor(.primary)
                                 Text(String(format: "%.0f", localCurrentISO))
-                                    .foregroundColor(.white)
+                                    .foregroundColor(.primary)
                                     .font(.system(.body, design: .monospaced))
                             }
                             .frame(minWidth: labelWidth, alignment: .leading)
