@@ -48,6 +48,9 @@ struct ContentView: View {
     @ObservedObject private var filmStockManager = FilmStockManager.shared
     @ObservedObject private var reciprocityCalculator = ReciprocityCalculator.shared
     
+    // Camera frame overlay manager
+    @StateObject private var frameOverlayManager = CameraFrameOverlayManager()
+    
     // Camera reference for photo capture
     @State private var cameraView: CameraPreviewView?
     
@@ -57,12 +60,17 @@ struct ContentView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Camera takes up top 2/3 of screen
-            CameraView(
-                meteringPoint: $meteringPoint,
-                isMeteringLocked: $isMeteringLocked,
-                currentEV: $currentEV,
-                cameraView: $cameraView
-            )
+            ZStack {
+                CameraView(
+                    meteringPoint: $meteringPoint,
+                    isMeteringLocked: $isMeteringLocked,
+                    currentEV: $currentEV,
+                    cameraView: $cameraView
+                )
+                
+                // Frame overlay
+                CameraFrameOverlayView(overlayManager: frameOverlayManager)
+            }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             
             // Bottom controls take up bottom 1/3
@@ -71,7 +79,8 @@ struct ContentView: View {
                 currentAperture: $currentAperture,
                 currentShutterSpeed: $currentShutterSpeed,
                 currentISO: $currentISO,
-                onLogShot: logShot
+                onLogShot: logShot,
+                frameOverlayManager: frameOverlayManager
             )
             .frame(height: 300)
             .background(Color(.systemBackground).opacity(0.95))
@@ -477,6 +486,7 @@ struct BottomControlsView: View {
     @Binding var currentShutterSpeed: Double
     @Binding var currentISO: Double
     let onLogShot: (Double, Double, Double, Double) -> Void
+    @ObservedObject var frameOverlayManager: CameraFrameOverlayManager
     
     var body: some View {
         HStack(spacing: 0) {
@@ -496,7 +506,8 @@ struct BottomControlsView: View {
                 currentShutterSpeed: currentShutterSpeed,
                 currentISO: currentISO,
                 currentEV: currentEV,
-                onLogShot: onLogShot
+                onLogShot: onLogShot,
+                frameOverlayManager: frameOverlayManager
             )
             .frame(maxWidth: 120, maxHeight: .infinity)
         }
@@ -1059,10 +1070,11 @@ struct SimpleLightMeterView: View {
         let currentISO: Double
         let currentEV: Double
         let onLogShot: (Double, Double, Double, Double) -> Void
+        @ObservedObject var frameOverlayManager: CameraFrameOverlayManager
         
         @State private var showingHistory = false
         @State private var showingSettings = false
-        @State private var showingLensCalculator = false
+        @State private var showingFrameOverlaySettings = false
         
         var body: some View {
             VStack(spacing: 20) {
@@ -1094,15 +1106,16 @@ struct SimpleLightMeterView: View {
                         .foregroundColor(.gray)
                 }
                 
-                // Small lens calculator button
+                // Small frame overlay button
                 Button(action: {
                     triggerHaptic(.light) // Light haptic for secondary actions
-                    showingLensCalculator = true
+                    showingFrameOverlaySettings = true
                 }) {
-                    Image(systemName: "camera.aperture")
+                    Image(systemName: frameOverlayManager.isOverlayEnabled ? "viewfinder.circle.fill" : "viewfinder.circle")
                         .font(.title2)
-                        .foregroundColor(.gray)
+                        .foregroundColor(frameOverlayManager.isOverlayEnabled ? .blue : .gray)
                 }
+                
                 
                 // Small history button
                 Button(action: {
@@ -1121,8 +1134,8 @@ struct SimpleLightMeterView: View {
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
             }
-            .sheet(isPresented: $showingLensCalculator) {
-                LensCalculatorView()
+            .sheet(isPresented: $showingFrameOverlaySettings) {
+                FrameOverlaySettingsView(overlayManager: frameOverlayManager)
             }
         }
     }
@@ -1667,6 +1680,25 @@ struct ShotLocationMapView: UIViewRepresentable {
                     }
                     
                     Section("Planning Tools") {
+                        NavigationLink(destination: LensCalculatorView(frameOverlayManager: nil)) {
+                            HStack {
+                                Image(systemName: "camera.aperture")
+                                    .foregroundColor(.blue)
+                                    .frame(width: 30)
+                                VStack(alignment: .leading) {
+                                    Text("Lens Calculator")
+                                        .foregroundColor(.primary)
+                                    Text("Field of view & crop factor calculator")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(.secondary)
+                                    .font(.caption)
+                            }
+                        }
+                        
                         NavigationLink(destination: SunCalculatorView()) {
                             HStack {
                                 Image(systemName: "sun.max")

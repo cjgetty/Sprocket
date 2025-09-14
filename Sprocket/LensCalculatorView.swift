@@ -77,6 +77,7 @@ extension CameraFormat {
 struct LensCalculatorView: View {
     @StateObject private var calculator = LensCalculatorManager()
     @AppStorage("appearanceMode") private var appearanceMode = "system"
+    var frameOverlayManager: CameraFrameOverlayManager?
     
     private var currentColorScheme: ColorScheme? {
         switch appearanceMode {
@@ -110,12 +111,23 @@ struct LensCalculatorView: View {
                     
                     // Comparison Tool
                     comparisonSection
+                    
+                    // Frame Overlay Integration
+                    if frameOverlayManager != nil {
+                        frameOverlayIntegrationSection
+                    }
                 }
                 .padding()
             }
             .navigationTitle("Lens Calculator")
         }
         .preferredColorScheme(currentColorScheme)
+        .onChange(of: calculator.focalLength) { _, newValue in
+            frameOverlayManager?.selectedTargetFocalLength = newValue
+        }
+        .onChange(of: calculator.selectedFormat) { _, newValue in
+            frameOverlayManager?.selectedTargetFormat = newValue
+        }
     }
     
     // MARK: - Focal Length Section
@@ -372,6 +384,53 @@ struct LensCalculatorView: View {
                     .foregroundColor(.orange)
             }
         }
+    }
+    
+    // MARK: - Frame Overlay Integration Section
+    private var frameOverlayIntegrationSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Camera Frame Overlay")
+                .font(.headline)
+            
+            if let overlayManager = frameOverlayManager {
+                VStack(spacing: 8) {
+                    Toggle("Enable Frame Preview", isOn: Binding(
+                        get: { overlayManager.isOverlayEnabled },
+                        set: { overlayManager.isOverlayEnabled = $0 }
+                    ))
+                    
+                    if overlayManager.isOverlayEnabled {
+                        HStack {
+                            Text("Preview this lens on camera")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Button("Settings") {
+                                // This would open frame overlay settings
+                            }
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                        }
+                        
+                        let targetFOV = 2 * atan(calculator.selectedFormat.sensorWidth / (2 * calculator.focalLength)) * 180 / .pi
+                        let iPhoneFOV = CameraFrameOverlayManager.iPhoneMainCamera.fieldOfView
+                        
+                        if targetFOV > iPhoneFOV {
+                            Label("Lens is wider than iPhone camera view", systemImage: "exclamationmark.triangle")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                        } else {
+                            Label("Frame overlay active on camera", systemImage: "checkmark.circle")
+                                .font(.caption)
+                                .foregroundColor(.green)
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color(UIColor.systemGray6))
+        .cornerRadius(12)
     }
 }
 
