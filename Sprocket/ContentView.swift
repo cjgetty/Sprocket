@@ -1062,6 +1062,7 @@ struct SimpleLightMeterView: View {
         
         @State private var showingHistory = false
         @State private var showingSettings = false
+        @State private var showingLensCalculator = false
         
         var body: some View {
             VStack(spacing: 20) {
@@ -1093,6 +1094,16 @@ struct SimpleLightMeterView: View {
                         .foregroundColor(.gray)
                 }
                 
+                // Small lens calculator button
+                Button(action: {
+                    triggerHaptic(.light) // Light haptic for secondary actions
+                    showingLensCalculator = true
+                }) {
+                    Image(systemName: "camera.aperture")
+                        .font(.title2)
+                        .foregroundColor(.gray)
+                }
+                
                 // Small history button
                 Button(action: {
                     triggerHaptic(.light) // Light haptic for secondary actions
@@ -1109,6 +1120,9 @@ struct SimpleLightMeterView: View {
             }
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
+            }
+            .sheet(isPresented: $showingLensCalculator) {
+                LensCalculatorView()
             }
         }
     }
