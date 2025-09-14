@@ -19,10 +19,20 @@ Sprocket is a comprehensive iOS application designed for film photographers who 
 - **Photo Capture**: Built-in camera integration for instant photo capture
 - **Frame Numbering**: Track frame numbers for film rolls
 
+### 🔍 **Lens Calculator & Planning Tools**
+- **Field of View Calculator**: Calculate horizontal, vertical, and diagonal FOV for any focal length
+- **Crop Factor Conversions**: Convert between Full Frame, APS-C, Micro 4/3, and other sensor formats
+- **Framing Predictions**: Visualize frame coverage at specified subject distances
+- **Format Comparison**: Side-by-side analysis of different camera formats and focal lengths
+- **Real-time Camera Overlay**: Live frame overlays on camera preview showing accurate framing for selected lenses
+- **iPhone Camera Integration**: Uses iPhone's actual camera specifications for precise overlay calculations
+
 ### 📱 **User Experience**
-- **Intuitive Interface**: Clean, modern SwiftUI design
+- **Intuitive Interface**: Clean, modern SwiftUI design optimized for one-handed use
 - **Haptic Feedback**: Tactile responses for better user interaction
 - **Real-time Metering**: Live exposure metering with tap-to-focus
+- **Dark Mode Support**: Full dark mode compatibility across all features
+- **Frame Overlay Controls**: Quick access viewfinder button for camera overlay settings
 - **Settings Persistence**: Remember your preferences across sessions
 - **Data Export**: Core Data integration for data management
 
@@ -75,6 +85,19 @@ Sprocket is a comprehensive iOS application designed for film photographers who 
 4. **Take Photo**: Use the built-in camera or add notes
 5. **Save Shot**: Tap the save button to log your shot
 
+### Using the Lens Calculator
+1. **Access Calculator**: Go to Settings → Planning Tools → Lens Calculator
+2. **Select Format**: Choose your camera's sensor format (Full Frame, APS-C, etc.)
+3. **Adjust Focal Length**: Use the slider to set your desired focal length
+4. **View Calculations**: See field of view angles, crop factor conversions, and framing predictions
+5. **Compare Formats**: Use the comparison tool to analyze different lens/format combinations
+
+### Camera Frame Overlay
+1. **Enable Overlay**: Tap the viewfinder button on the main camera screen
+2. **Configure Settings**: Adjust overlay opacity and select target lens/format
+3. **Live Preview**: See real-time frame overlays showing how your selected lens would frame the shot
+4. **Integration**: Changes in the lens calculator automatically update the camera overlay
+
 ### Managing Your Shots
 - View all logged shots in the history section
 - Search and filter by date, location, or equipment
@@ -85,7 +108,9 @@ Sprocket is a comprehensive iOS application designed for film photographers who 
 
 ### Core Components
 
-- **`ContentView`**: Main SwiftUI interface with camera controls and shot logging
+- **`ContentView`**: Main SwiftUI interface with camera controls, shot logging, and frame overlay integration
+- **`LensCalculatorView`**: Comprehensive lens calculator with field of view calculations and format comparisons
+- **`CameraFrameOverlay`**: Real-time camera frame overlay system with iPhone camera integration
 - **`CoreDataManager`**: Handles data persistence and Core Data operations
 - **`LocationManager`**: Manages GPS location services and reverse geocoding
 - **`PhotoCaptureManager`**: Handles camera integration and photo capture
@@ -126,6 +151,9 @@ The app uses a `LoggedShot` entity with the following attributes:
 - Customize default camera settings
 - Set preferred location accuracy
 - Configure data retention policies
+- Access lens calculator and planning tools
+- Adjust camera frame overlay opacity and settings
+- Toggle dark mode preferences
 
 ### UI Themes
 The app follows iOS design guidelines with:
